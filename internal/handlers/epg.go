@@ -87,11 +87,14 @@ func WebEPGHandler(c *fiber.Ctx) error {
 	}
 
 	url := fmt.Sprintf(epg.EPG_URL, offset, channelIntID)
+	utils.Log.Printf("Proxying EPG request for channel %d, offset %d to %s", channelIntID, offset, url)
 	internalUtils.SetCommonHeaders(c, headers.UserAgentOkHttp)
 	if err := proxy.Do(c, url, TV.Client); err != nil {
+		utils.Log.Printf("Error proxying EPG request for channel %d: %v", channelIntID, err)
 		return err
 	}
 
+	utils.Log.Printf("EPG response status for channel %d: %d", channelIntID, c.Response().StatusCode())
 	c.Response().Header.Del(fiber.HeaderServer)
 	return nil
 }

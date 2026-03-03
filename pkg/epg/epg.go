@@ -196,22 +196,26 @@ func genXML() ([]byte, error) {
 
 			var epgResponse EPGResponse
 			if err := json.Unmarshal(body, &epgResponse); err != nil {
-				// Handle error
 				utils.Log.Printf("Error unmarshaling EPG response for channel %d, offset %d: %v", channel.ID, offset, err)
-				// Print response body for debugging
-				utils.Log.Printf("Response body: %s", body)
+				utils.Log.Printf("Response body snippet: %s", string(body[:utils.Min(len(body), 500)]))
 				continue
 			}
 
+			if len(epgResponse.EPG) == 0 {
+				utils.Log.Printf("No EPG programs found for channel %d, offset %d", channel.ID, offset)
+			} else {
+				utils.Log.Printf("Found %d programs for channel %d, offset %d", len(epgResponse.EPG), channel.ID, offset)
+			}
+
 			for _, programme := range epgResponse.EPG {
-				startT, okStart := timeFromEpoch(programme.StartEpoch)
-				endT, okEnd := timeFromEpoch(programme.EndEpoch)
+				startT, okStart := timeFromEpoch(int64(programme.StartEpoch))
+				endT, okEnd := timeFromEpoch(int64(programme.EndEpoch))
 				if !okStart || !okEnd {
 					continue
 				}
 				startTime := formatTime(startT)
 				endTime := formatTime(endT)
-				p := NewProgramme(channel.ID, startTime, endTime, programme.Title, programme.Description, programme.ShowCategory, programme.Poster)
+				p := NewProgramme(int(programme.ChannelID), startTime, endTime, string(programme.Title), string(programme.Description), string(programme.ShowCategory), string(programme.Poster))
 				programmesMu.Lock()
 				programmes = append(programmes, p)
 				programmesMu.Unlock()
@@ -255,8 +259,8 @@ func genXML() ([]byte, error) {
 
 	for _, channel := range channelsResponse.Channels {
 		channels = append(channels, Channel{
-			ID:      channel.ChannelID,
-			Display: channel.ChannelName,
+			ID:      int(channel.ChannelID),
+			Display: string(channel.ChannelName),
 		})
 	}
 	utils.Log.Println("Fetched", len(channels), "channels")

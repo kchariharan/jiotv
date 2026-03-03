@@ -511,6 +511,14 @@ func GenerateRandomString() error {
 	return nil
 }
 
+// Min returns the smaller of a and b
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func BuildHLSPlayURL(quality, channelID string) string {
 	if quality != "" {
 		return fmt.Sprintf("/live/%s/%s.m3u8", quality, channelID)

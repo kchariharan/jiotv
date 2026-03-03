@@ -192,81 +192,142 @@ func TestGenXMLGz(t *testing.T) {
 	}
 }
 
-func TestEpochString_UnmarshalJSON(t *testing.T) {
+func TestJSONInt64_UnmarshalJSON(t *testing.T) {
 	type args struct {
 		data []byte
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    EpochString
+		want    JSONInt64
 		wantErr bool
 	}{
 		{
 			name:    "Unmarshal from integer",
-			args:    args{data: []byte("1609459200123")}, // 13-digit timestamp
-			want:    EpochString("1609459200"),           // Should be truncated to 10 digits
+			args:    args{data: []byte("1609459200123")},
+			want:    JSONInt64(1609459200123),
 			wantErr: false,
 		},
 		{
 			name:    "Unmarshal from string",
-			args:    args{data: []byte(`"test_string"`)},
-			want:    EpochString("test_string"),
+			args:    args{data: []byte(`"1609459200123"`)},
+			want:    JSONInt64(1609459200123),
 			wantErr: false,
 		},
 		{
-			name:    "Unmarshal from empty string",
-			args:    args{data: []byte(`""`)},
-			want:    EpochString(""),
-			wantErr: false,
+			name:    "Unmarshal invalid string",
+			args:    args{data: []byte(`"abc"`)},
+			want:    JSONInt64(0),
+			wantErr: true,
 		},
 		{
 			name:    "Unmarshal invalid JSON",
 			args:    args{data: []byte("invalid json")},
-			want:    EpochString(""),
+			want:    JSONInt64(0),
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var id EpochString
-			err := id.UnmarshalJSON(tt.args.data)
+			var i JSONInt64
+			err := i.UnmarshalJSON(tt.args.data)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("EpochString.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("JSONInt64.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && id != tt.want {
-				t.Errorf("EpochString.UnmarshalJSON() = %v, want %v", id, tt.want)
+			if !tt.wantErr && i != tt.want {
+				t.Errorf("JSONInt64.UnmarshalJSON() = %v, want %v", i, tt.want)
 			}
 		})
 	}
 }
 
-func TestEpochString_String(t *testing.T) {
+func TestJSONInt_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
 	tests := []struct {
-		name string
-		id   EpochString
-		want string
+		name    string
+		args    args
+		want    JSONInt
+		wantErr bool
 	}{
 		{
-			name: "String representation of epoch",
-			id:   EpochString("1609459200"),
-			want: "1609459200",
+			name:    "Unmarshal from integer",
+			args:    args{data: []byte("144")},
+			want:    JSONInt(144),
+			wantErr: false,
 		},
 		{
-			name: "String representation of empty epoch",
-			id:   EpochString(""),
-			want: "",
+			name:    "Unmarshal from string",
+			args:    args{data: []byte(`"144"`)},
+			want:    JSONInt(144),
+			wantErr: false,
 		},
 		{
-			name: "String representation of text epoch",
-			id:   EpochString("test_string"),
-			want: "test_string",
+			name:    "Unmarshal invalid string",
+			args:    args{data: []byte(`"abc"`)},
+			want:    JSONInt(0),
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.id.String(); got != tt.want {
-				t.Errorf("EpochString.String() = %v, want %v", got, tt.want)
+			var i JSONInt
+			err := i.UnmarshalJSON(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("JSONInt.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && i != tt.want {
+				t.Errorf("JSONInt.UnmarshalJSON() = %v, want %v", i, tt.want)
+			}
+		})
+	}
+}
+
+func TestJSONString_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    JSONString
+		wantErr bool
+	}{
+		{
+			name:    "Unmarshal from string",
+			args:    args{data: []byte(`"test"`)},
+			want:    JSONString("test"),
+			wantErr: false,
+		},
+		{
+			name:    "Unmarshal from array",
+			args:    args{data: []byte(`["test"]`)},
+			want:    JSONString("test"),
+			wantErr: false,
+		},
+		{
+			name:    "Unmarshal from empty array",
+			args:    args{data: []byte(`[]`)},
+			want:    JSONString(""),
+			wantErr: false,
+		},
+		{
+			name:    "Unmarshal null",
+			args:    args{data: []byte(`null`)},
+			want:    JSONString(""),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s JSONString
+			err := s.UnmarshalJSON(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("JSONString.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && s != tt.want {
+				t.Errorf("JSONString.UnmarshalJSON() = %v, want %v", s, tt.want)
 			}
 		})
 	}

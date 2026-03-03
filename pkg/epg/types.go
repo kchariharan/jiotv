@@ -66,9 +66,9 @@ type EPG struct {
 
 // ChannelObject represents Individual channel detail from JioTV API response
 type ChannelObject struct {
-	ChannelID   int    `json:"channel_id"`   // Channel ID
-	ChannelName string `json:"channel_name"` // Channel name
-	LogoURL     string `json:"logoUrl"`      // Channel logo URL
+	ChannelID   JSONInt    `json:"channel_id"`   // Channel ID
+	ChannelName JSONString `json:"channel_name"` // Channel name
+	LogoURL     JSONString `json:"logoUrl"`      // Channel logo URL
 }
 
 // ChannelsResponse represents Channel details from JioTV API response
@@ -80,15 +80,15 @@ type ChannelsResponse struct {
 
 // EPGObject represents Individual EPG detail from JioTV EPG API response
 type EPGObject struct {
-	StartEpoch   int64  `json:"startEpoch"`       // Start time of the programme
-	EndEpoch     int64  `json:"endEpoch"`         // End time of the programme
-	ChannelID    uint16 `json:"channel_id"`       // Channel ID
-	ChannelName  string `json:"channel_name"`     // Channel name
-	ShowCategory string `json:"showCategory"`     // Category of the show
-	Description  string `json:"description"`      // Description of the show
-	Title        string `json:"showname"`         // Title of the show
-	Thumbnail    string `json:"episodeThumbnail"` // Thumbnail of the show
-	Poster       string `json:"episodePoster"`    // Poster of the show
+	StartEpoch   JSONInt64  `json:"startEpoch"`       // Start time of the programme
+	EndEpoch     JSONInt64  `json:"endEpoch"`         // End time of the programme
+	ChannelID    JSONInt    `json:"channel_id"`       // Channel ID
+	ChannelName  JSONString `json:"channel_name"`     // Channel name
+	ShowCategory JSONString `json:"showCategory"`     // Category of the show
+	Description  JSONString `json:"description"`      // Description of the show
+	Title        JSONString `json:"showname"`         // Title of the show
+	Thumbnail    JSONString `json:"episodeThumbnail"` // Thumbnail of the show
+	Poster       JSONString `json:"episodePoster"`    // Poster of the show
 }
 
 // EPGResponse represents EPG details from JioTV EPG API response
@@ -96,28 +96,81 @@ type EPGResponse struct {
 	EPG []EPGObject `json:"epg"` // EPG details for a channel
 }
 
-// EpochString is a custom type for unmarshaling epoch from integers to strings in JioTV EPG API
-type EpochString string
+// JSONInt64 is a custom type for unmarshaling int64 from both strings and integers
+type JSONInt64 int64
 
-// UnmarshalJSON unmarshals epoch integers to strings from JioTV EPG API
-func (id *EpochString) UnmarshalJSON(data []byte) error {
-	// Try to unmarshal as integer
-	var intValue int
-	// If it fails, unmarshal as string
-	if err := json.Unmarshal(data, &intValue); err != nil {
-		var stringValue string
-		if err := json.Unmarshal(data, &stringValue); err != nil {
+// UnmarshalJSON unmarshals both strings and integers into int64
+func (i *JSONInt64) UnmarshalJSON(data []byte) error {
+	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
 			return err
 		}
-		*id = EpochString(stringValue)
-	} else {
-		// limit to 10 digits
-		*id = EpochString(strconv.Itoa(intValue)[:10])
+		val, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return err
+		}
+		*i = JSONInt64(val)
+		return nil
 	}
+	var val int64
+	if err := json.Unmarshal(data, &val); err != nil {
+		return err
+	}
+	*i = JSONInt64(val)
 	return nil
 }
 
-// String returns the string representation of the EpochString
-func (id *EpochString) String() string {
-	return string(*id)
+// JSONInt is a custom type for unmarshaling int from both strings and integers
+type JSONInt int
+
+// UnmarshalJSON unmarshals both strings and integers into int
+func (i *JSONInt) UnmarshalJSON(data []byte) error {
+	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		val, err := strconv.Atoi(s)
+		if err != nil {
+			return err
+		}
+		*i = JSONInt(val)
+		return nil
+	}
+	var val int
+	if err := json.Unmarshal(data, &val); err != nil {
+		return err
+	}
+	*i = JSONInt(val)
+	return nil
+}
+
+// JSONString is a custom type for unmarshaling string from both string and array of strings
+type JSONString string
+
+// UnmarshalJSON unmarshals both string and array of strings into string
+func (s *JSONString) UnmarshalJSON(data []byte) error {
+	if len(data) >= 2 && data[0] == '[' {
+		var arr []string
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+		if len(arr) > 0 {
+			*s = JSONString(arr[0])
+		} else {
+			*s = ""
+		}
+		return nil
+	}
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*s = JSONString(str)
+	return nil
+}
+
+func (s JSONString) String() string {
+	return string(s)
 }

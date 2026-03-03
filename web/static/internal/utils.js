@@ -236,11 +236,15 @@ async function getJSON(url, options = {}) {
   try {
     const response = await fetch(url, options);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const error = new Error(`HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } catch (error) {
-    console.error(`Error making GET request to ${url}:`, error);
+    if (!options.suppressErrorLog) {
+      console.error(`Error making GET request to ${url}:`, error);
+    }
     throw error;
   }
 }

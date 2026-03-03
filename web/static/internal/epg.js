@@ -1,19 +1,27 @@
 function getCurrentAndNextTwoShows(epgData) {
   const currentTime = new Date(); // Current date time
+  console.log("Current time for EPG:", currentTime.toISOString());
   const shows = [];
   let currentIndex = -1;
   const toMillis = (epoch) => {
     const n = Number(epoch);
-    if (!Number.isFinite(n)) return NaN;
-    return n < 1e12 ? n * 1000 : n;
+    if (!Number.isFinite(n)) {
+        console.error("Invalid epoch for conversion:", epoch);
+        return NaN;
+    }
+    const result = n < 1e12 ? n * 1000 : n;
+    return result;
   };
 
   // Find the currently playing show
   epgData.epg.some((show, index) => {
-    const showStartTime = new Date(toMillis(show.startEpoch));
-    const showEndTime = new Date(toMillis(show.endEpoch));
+    const startM = toMillis(show.startEpoch);
+    const endM = toMillis(show.endEpoch);
+    const showStartTime = new Date(startM);
+    const showEndTime = new Date(endM);
 
     if (showStartTime <= currentTime && currentTime < showEndTime) {
+      console.log(`Matched current show at index ${index}: ${show.showname}`);
       const { showname, description, endEpoch, episodePoster, keywords } = show;
       shows.push({
         showname,
@@ -27,6 +35,15 @@ function getCurrentAndNextTwoShows(epgData) {
     }
     return false;
   });
+
+  if (currentIndex === -1) {
+    console.warn("Could not find currently playing show in EPG data for current time:", currentTime);
+    if (epgData.epg.length > 0) {
+        const first = new Date(toMillis(epgData.epg[0].startEpoch));
+        const last = new Date(toMillis(epgData.epg[epgData.epg.length-1].endEpoch));
+        console.log(`EPG data range: ${first.toISOString()} to ${last.toISOString()}`);
+    }
+  }
 
   // Get the next two shows
   if (currentIndex !== -1) {
@@ -151,8 +168,8 @@ function renderSimilarChannels(similarChannels) {
     // Determine logo URL (handle both custom and regular channels)
     const logoURL =
       channel.logoUrl &&
-      (channel.logoUrl.startsWith("http://") ||
-        channel.logoUrl.startsWith("https://"))
+        (channel.logoUrl.startsWith("http://") ||
+          channel.logoUrl.startsWith("https://"))
         ? channel.logoUrl
         : `/jtvimage/${channel.logoUrl}`;
 
@@ -209,15 +226,22 @@ function updateEPG(epgData) {
     "description",
     "episodePoster",
     "keywords",
+    "epg_parent",
   ]);
   const {
     showname: shownameElement,
     description: descriptionElement,
     episodePoster: episodePosterElement,
     keywords: keywordsElement,
+    epg_parent: epgParent,
   } = elements;
 
-  if (shows.length === 0) return;
+  if (shows.length === 0) {
+    if (epgParent) epgParent.style.display = "none";
+    return;
+  }
+
+  if (epgParent) epgParent.style.display = "block";
 
   if (shownameElement) shownameElement.textContent = shows[0].showname;
   if (descriptionElement) descriptionElement.textContent = shows[0].description;
@@ -314,15 +338,49 @@ const epgParent = safeGetElementById("epg_parent");
 if (epgParent) epgParent.style.display = "none";
 
 (async () => {
-  // Load EPG data
+  // Load EPG data independently
   try {
-    const epgData = await getJSON(`/epg/${channelID}/${offset}`);
-    if (epgParent) epgParent.style.display = "block";
-    updateEPG(epgData);
+    const fetchEPGWithOffset = async (off) => {
+        const epgUrl = `/epg/${channelID}/${off}`;
+        console.log(`Fetching EPG from: ${epgUrl}`);
+        const data = await getJSON(epgUrl, { suppressErrorLog: true });
+        if (data && data.epg) {
+            console.log(`Found ${data.epg.length} EPG programs for offset ${off}`);
+            // Check if any show matches current time
+            const shows = getCurrentAndNextTwoShows(data);
+            if (shows.length > 0) {
+                return { data, shows };
+            }
+            console.log(`No current show in EPG offset ${off}`);
+        }
+        return null;
+    };
 
-    // Load similar channels
+    let result = await fetchEPGWithOffset(0);
+    
+    // If offset 0 didn't have current show, try offset 1
+    if (!result) {
+        console.log("Retrying with offset 1...");
+        result = await fetchEPGWithOffset(1);
+    }
+
+    if (result) {
+      if (epgParent) epgParent.style.display = "block";
+      updateEPG(result.data);
+    } else {
+      console.warn("Could not find relevant EPG data in offset 0 or 1");
+    }
+  } catch (error) {
+    // Expected for some channels, ignore to avoid spam
+    if (error.status && error.status !== 404) {
+      console.warn("Failed to fetch EPG data:", error.message);
+    }
+  }
+
+  // Load similar channels
+  try {
     await loadSimilarChannels();
   } catch (error) {
-    console.error("Failed to fetch EPG data:", error);
+    console.error("Failed to load similar channels:", error);
   }
 })();
